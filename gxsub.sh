@@ -13,15 +13,31 @@ GXENUM_DIR="$HOME/.gxenum"
 CACHE_DIR="$HOME/.cache/gxenum"
 CONFIG_DIR="$HOME/.config/gxenum"
 STATS_FILE="$CONFIG_DIR/run_stats.json"
-CACHE_NEW_SUBS="$CACHE_DIR/new_subs.txt"
+CACHE_NEW_SUBS="$CACHE_DIR/new_subs.$TARGET_DOMAIN.$TIME_OF_RUN.txt"
 SUBFINDER_OUTPUT="$GXENUM_DIR/$TARGET_DOMAIN.$TIME_OF_RUN.subfinder.json"
 SUBFINDER="$HOME/go/bin/subfinder"
 ALL_SUBS_FILE="$GXENUM_DIR/$TARGET_DOMAIN.subs"
+HTTPX_OUTPUT="$GXENUM_DIR/$TARGET_DOMAIN.$TIME_OF_RUN.httpx"
+HTTPX_FINAL_OUTPUT="$GXENUM_DIR/$TARGET_DOMAIN.httpx"
+CACHE_NEW_HTTPX="$CACHE_DIR/new_httpx.$TARGET_DOMAIN.$TIME_OF_RUN.httpx"
 FIRST_RUN=false
-NOTIFY_DISCORD_NEWSUB_ID="new_subdomains"
+NOTIFY_DISCORD_NEW_SUB_ID="new_subdomains"
+NOTIFY_DISCORD_NEW_HTTPX_ID="new_httpx"
 JQ="/usr/bin/jq"
 ANEW="$HOME/go/bin/anew"
 NOTIFY="$HOME/go/bin/notify"
+HTTPX="$HOME/go/bin/httpx"
+
+# Function to remove an empty file
+remove_empty_files() {
+  for file in "$@"; do
+
+  # Check if file exists and is empty
+    if [[ -e "$file" && ! -s "$file" ]]; then
+      rm "$file"
+    fi
+  done
+}
 
 # Ensure a domain was provided
 if [[ -z "$TARGET_DOMAIN" ]]; then
@@ -46,13 +62,7 @@ fi
 
 # Ensure the final subs file exists -> if not, it is the first run
 if [[ ! -f "$ALL_SUBS_FILE" ]]; then
-    /usr/bin/touch "$ALL_SUBS_FILE"
     FIRST_RUN=true
-fi
-
-# Remove previous new subs cache
-if [[ -f "$CACHE_NEW_SUBS" ]]; then
-    /usr/bin/rm -f $CACHE_NEW_SUBS
 fi
 
 # Get current date values
@@ -93,9 +103,9 @@ echo "$UPDATED_DATA" > "$STATS_FILE"
 #fi
 
 # Exclude sources more efficiently so it could consume the sources over the month instead of a single day
-if [[ "$DAILY_COUNT" -gt 8 ]]; then
+if [[ "$DAILY_COUNT" -gt 8 || "$MONTHLY_COUNT" -gt 250 ]]; then
     EXCLUDED_SOURCES="chaos,fullhunt,bevigil,dnsdumpster,securitytrails,binaryedge"
-elif [[ "$DAILY_COUNT" -gt 1 ]]; then
+elif [[ "$DAILY_COUNT" -gt 1 || "$MONTHLY_COUNT" -gt 50 ]]; then
     EXCLUDED_SOURCES="chaos,fullhunt,bevigil,dnsdumpster,securitytrails"
 elif [[ "$WEEKLY_COUNT" -gt 1 ]]; then
     EXCLUDED_SOURCES="chaos,fullhunt"
@@ -113,15 +123,28 @@ fi
 ##############
 echo $TIME_OF_RUN >> /var/tmp/gxenum.log
 echo $SUBFINDER_CMD >> /var/tmp/gxenum.log
-#$SUBFINDER_CMD
+$SUBFINDER_CMD
 
 # Append new domains to the final sub files and store it in cache for Notify tool
-cat $SUBFINDER_OUTPUT | $JQ -r '.host' | $ANEW $ALL_SUBS_FILE > $CACHE_NEW_SUBS
+/usr/bin/cat $SUBFINDER_OUTPUT | $JQ -r '.host' | $ANEW $ALL_SUBS_FILE > $CACHE_NEW_SUBS
 
 ###########
 #Run Notify
 ###########
 if [[ "$FIRST_RUN" == false ]]; then
-    $NOTIFY -silent -bulk -i $CACHE_NEW_SUBS -id $NOTIFY_DISCORD_NEWSUB_ID &>/dev/null
+    $NOTIFY -silent -bulk -i $CACHE_NEW_SUBS -id $NOTIFY_DISCORD_NEW_SUB_ID &>/dev/null
 fi
 
+###############
+#httpx
+###############
+$HTTPX -l $ALL_SUBS_FILE -silent -sc -cl -location -title -td -no-color -o $HTTPX_OUTPUT
+
+/usr/bin/cat $HTTPX_OUTPUT | $ANEW $HTTPX_FINAL_OUTPUT > $CACHE_NEW_HTTPX
+
+if [[ "$FIRST_RUN" == false ]]; then
+    $NOTIFY -silent -bulk -i $CACHE_NEW_HTTPX -id $NOTIFY_DISCORD_NEW_HTTPX_ID &>/dev/null
+fi
+
+# Remove cache files
+remove_empty_files "$CACHE_NEW_SUBS" "$CACHE_NEW_HTTPX"
