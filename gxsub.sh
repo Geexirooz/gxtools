@@ -142,9 +142,9 @@ $HTTPX -l $ALL_SUBS_FILE -silent -sc -location -title -td -no-color -o $HTTPX_OU
 
 /usr/bin/cat $HTTPX_OUTPUT | $ANEW $HTTPX_FINAL_OUTPUT > $CACHE_NEW_HTTPX
 
-#if [[ "$FIRST_RUN" == false ]]; then
-#    $NOTIFY -silent -bulk -i $CACHE_NEW_HTTPX -id $NOTIFY_DISCORD_NEW_HTTPX_ID &>/dev/null
-#fi
+if [[ "$FIRST_RUN" == false ]]; then
+    $NOTIFY -silent -bulk -i $CACHE_NEW_HTTPX -id $NOTIFY_DISCORD_NEW_HTTPX_ID &>/dev/null
+fi
 
 # Remove cache files
 remove_empty_files "$CACHE_NEW_SUBS" "$CACHE_NEW_HTTPX"
