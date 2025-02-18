@@ -13,12 +13,14 @@ GXENUM_DIR="$HOME/.gxenum"
 CACHE_DIR="$HOME/.cache/gxenum"
 CONFIG_DIR="$HOME/.config/gxenum"
 STATS_FILE="$CONFIG_DIR/run_stats.json"
-CACHE_NEW_SUBS="$CACHE_DIR/new_subs.$TARGET_DOMAIN.$TIME_OF_RUN.txt"
+CACHE_NEW_ACTIVE_SUBS="$CACHE_DIR/new_active_subs.$TARGET_DOMAIN.$TIME_OF_RUN.txt"
 SUBFINDER_OUTPUT="$GXENUM_DIR/$TARGET_DOMAIN.$TIME_OF_RUN.subfinder.json"
 SUBFINDER="$HOME/go/bin/subfinder"
 ALL_SUBS_FILE="$GXENUM_DIR/$TARGET_DOMAIN.subs"
+ALL_ACTIVE_SUBS="$GXENUM_DIR/$TARGET_DOMAIN.active.subs"
 HTTPX_OUTPUT="$GXENUM_DIR/$TARGET_DOMAIN.$TIME_OF_RUN.httpx"
 HTTPX_FINAL_OUTPUT="$GXENUM_DIR/$TARGET_DOMAIN.httpx"
+RESOLVERS_FILES="$GXENUM_DIR/resolvers.txt"
 CACHE_NEW_HTTPX="$CACHE_DIR/new_httpx.$TARGET_DOMAIN.$TIME_OF_RUN.httpx"
 FIRST_RUN=false
 NOTIFY_DISCORD_NEW_SUB_ID="new_subdomains"
@@ -27,6 +29,7 @@ JQ="/usr/bin/jq"
 ANEW="$HOME/go/bin/anew"
 NOTIFY="$HOME/go/bin/notify"
 HTTPX="$HOME/go/bin/httpx"
+DNSX="$HOME/go/bin/dnsx"
 
 # Function to remove an empty file
 remove_empty_files() {
@@ -126,19 +129,33 @@ echo $SUBFINDER_CMD >> /var/tmp/gxenum.log
 $SUBFINDER_CMD
 
 # Append new domains to the final sub files and store it in cache for Notify tool
-/usr/bin/cat $SUBFINDER_OUTPUT | $JQ -r '.host' | $ANEW $ALL_SUBS_FILE > $CACHE_NEW_SUBS
+/usr/bin/cat $SUBFINDER_OUTPUT | $JQ -r '.host' | $ANEW -q $ALL_SUBS_FILE
+
+# Run DNS queries 3 times for reliability
+#if it's the first time -> resolve all domains
+if [[ "$FIRST_RUN" == true ]]; then
+  for i in {1..3}; do
+    /usr/bin/cat $ALL_SUBS_FILE | $DNSX -all -silent -r $RESOLVERS_FILES | /usr/bin/cut -d' ' -f1 | $ANEW -q $ALL_ACTIVE_SUBS
+  done
+#if not the first time -> just try to resolve previously inactive domains
+else
+  for i in {1..3}; do
+    /usr/bin/cat $ALL_SUBS_FILE | $ANEW -d $ALL_ACTIVE_SUBS |$DNSX -all -silent -r $RESOLVERS_FILES | /usr/bin/cut -d' ' -f1 | $ANEW $CACHE_NEW_ACTIVE_SUBS | $ANEW -q $ALL_ACTIVE_SUBS
+  done
+fi
 
 ###########
 #Run Notify
 ###########
 if [[ "$FIRST_RUN" == false ]]; then
-    $NOTIFY -silent -bulk -i $CACHE_NEW_SUBS -id $NOTIFY_DISCORD_NEW_SUB_ID &>/dev/null
+    $NOTIFY -silent -bulk -i $CACHE_NEW_ACTIVE_SUBS -id $NOTIFY_DISCORD_NEW_SUB_ID &>/dev/null
 fi
 
 ###############
 #httpx
 ###############
-$HTTPX -l $ALL_SUBS_FILE -silent -sc -location -title -td -no-color -o $HTTPX_OUTPUT
+# Run httpx against live hosts
+$HTTPX -l $ALL_ACTIVE_SUBS -silent -sc -location -title -td -no-color -o $HTTPX_OUTPUT
 
 /usr/bin/cat $HTTPX_OUTPUT | $ANEW $HTTPX_FINAL_OUTPUT > $CACHE_NEW_HTTPX
 
@@ -147,4 +164,4 @@ if [[ "$FIRST_RUN" == false ]]; then
 fi
 
 # Remove cache files
-remove_empty_files "$CACHE_NEW_SUBS" "$CACHE_NEW_HTTPX"
+remove_empty_files "$CACHE_NEW_ACTIVE_SUBS" "$CACHE_NEW_HTTPX"
