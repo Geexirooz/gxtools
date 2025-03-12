@@ -1,5 +1,18 @@
 #!/bin/bash
 
+# Function to print usage/help message
+usage() {
+    echo "Usage: $0 <domain> <output-dir>"
+    echo "Example: $0 site.com wlist"
+    exit 1
+}
+
+# Check if exactly two parameters are provided
+if [ "$#" -ne 2 ]; then
+    echo "Error: Exactly two parameters required."
+    usage
+fi
+
 # Input
 DOMAIN="$1"
 OUTPUT_DIR="$2"
