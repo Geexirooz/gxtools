@@ -29,7 +29,7 @@ def main():
     parser.add_argument('headers_file', help="Path to the headers.txt file")
     parser.add_argument('--format', choices=['single', 'multiple'], default='multiple', help="Choose the output format ('single' or 'multiple')")
     parser.add_argument('--switch', default='header', help="Specify the header switch name (e.g., 'header', 'h')")
-    parser.add_argument('--style', choices=['unix', 'linux'], default='linux', help="Specify the style of the switch -> unix(single) or linux(double) hyphen")
+    parser.add_argument('--style', choices=['unix', 'linux'], default='unix', help="Specify the style of the switch -> unix(single) or linux(double) hyphen")
  
     args = parser.parse_args()
 
