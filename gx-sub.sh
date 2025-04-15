@@ -20,6 +20,10 @@ CONFIG_DIR="$HOME/.config/gxenum"
 # Define stats file
 STATS_FILE="$CONFIG_DIR/run_stats.json"
 
+# Define log files
+SUBFINDER_STDERR_LOGS_FILE="/var/tmp/gxenum.err"
+SUBFINDER_STDOUT_LOGS_FILE="/var/tmp/gxenum.out"
+
 # Define subfinder files
 SUBFINDER_OUTPUT="$GXENUM_DIR/$TARGET_DOMAIN.$TIME_OF_RUN.subfinder.json"
 SUBFINDER="$HOME/go/bin/subfinder"
@@ -147,10 +151,7 @@ else
     SUBFINDER_CMD="$SUBFINDER -o $SUBFINDER_OUTPUT -oJ -cs -silent -nc -all -d $TARGET_DOMAIN"
 fi
 
-#######Delete the following 2 lines
-echo $TIME_OF_RUN >> /var/tmp/gxenum.log
-echo $SUBFINDER_CMD >> /var/tmp/gxenum.log
-$SUBFINDER_CMD
+$SUBFINDER_CMD >> $SUBFINDER_STDERR_LOGS_FILE 2>> $SUBFINDER_STDERR_LOGS_FILE
 
 ###################################################
 # Find new subdomains and accumulate all subdomains
@@ -188,7 +189,7 @@ fi
 ######
 
 # Run httpx against live hosts
-$HTTPX -l $ALL_ACTIVE_SUBS -silent -sc -no-color -p $HTTPX_PORTS -o $HTTPX_OUTPUT
+$HTTPX -r $RESOLVERS_FILES -l $ALL_ACTIVE_SUBS -silent -sc -no-color -p $HTTPX_PORTS -o $HTTPX_OUTPUT
 
 # Extract new URLs
 /usr/bin/cat $HTTPX_OUTPUT | $ANEW $HTTPX_FINAL_OUTPUT > $CACHE_NEW_HTTPX
